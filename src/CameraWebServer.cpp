@@ -16,11 +16,48 @@ const char *password = "12345678";
 void startCameraServer();
 void setupLedFlash();
 
-//IPAddress local_ip(10, 10, 10, 1);
-//IPAddress gateway(10, 10, 10, 1);
-//IPAddress subnet(255, 255, 255, 0);
+IPAddress local_ip{10, 10, 10, 1};
+IPAddress gateway{10, 10, 10, 1};
+IPAddress subnet{255, 255, 255, 0};
 
 const int LED_PIN = 21;
+
+void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
+  switch (event) {
+    case ARDUINO_EVENT_WIFI_AP_STACONNECTED:
+      Serial.println("Client connected to ESP32 AP");
+      Serial.printf(
+        "MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+        info.wifi_ap_staconnected.mac[0],
+        info.wifi_ap_staconnected.mac[1],
+        info.wifi_ap_staconnected.mac[2],
+        info.wifi_ap_staconnected.mac[3],
+        info.wifi_ap_staconnected.mac[4],
+        info.wifi_ap_staconnected.mac[5]
+      );
+      break;
+
+    case ARDUINO_EVENT_WIFI_AP_STAIPASSIGNED:
+      Serial.println("Client got IP address from ESP32 DHCP server");
+      break;
+
+    case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED:
+      Serial.println("Client disconnected from ESP32 AP");
+      Serial.printf(
+        "MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+        info.wifi_ap_stadisconnected.mac[0],
+        info.wifi_ap_stadisconnected.mac[1],
+        info.wifi_ap_stadisconnected.mac[2],
+        info.wifi_ap_stadisconnected.mac[3],
+        info.wifi_ap_stadisconnected.mac[4],
+        info.wifi_ap_stadisconnected.mac[5]
+      );
+      break;
+
+    default:
+      break;
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -108,22 +145,27 @@ void setup() {
   s->set_vflip(s, 1);
 #endif
 
-  WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
+  WiFi.mode(WIFI_AP);
 
-  Serial.print("WiFi connecting");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  if (!WiFi.softAPConfig(local_ip, gateway, subnet)) {
+    Serial.println("softAPConfig failed");
   }
-  Serial.println("");
-  Serial.println("WiFi connected");
+  if (!WiFi.softAP(ssid, password)) {
+    Serial.println("Failed to start access point");
+    return;
+  }
 
+  Serial.println("Access point started");
+  Serial.print("SSID: ");
+  Serial.println(ssid);
+  Serial.print("Password: ");
+  Serial.println(password);
+  Serial.print("AP IP address: ");
 
   startCameraServer();
 
   Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.localIP());
+  Serial.println(WiFi.softAPIP());
   Serial.println("' to connect");
   
   pinMode(LED_PIN, OUTPUT);
@@ -137,4 +179,8 @@ void loop() {
   delay(500);
   // Do nothing. Everything is done in another task by the web server
   delay(500);
+
+  Serial.print("Camera Ready! Use 'http://");
+  Serial.println(WiFi.softAPIP());
+  Serial.println("' to connect");
 }
